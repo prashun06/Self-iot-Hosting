@@ -23,7 +23,7 @@ void reconnect()
             Serial.print("connect to MQTT");
             client.subscribe("fromNodeRED"); //broker subscription 1
             client.subscribe("ledState"); //broker subscription 2
-            // client.subscribe("JSONfromNodeRED");
+            client.subscribe("JSONfromNodeRED");
         }
         else
         {
@@ -57,6 +57,28 @@ void callback(char *topic, byte *message, unsigned int length)
             digitalWrite(led, HIGH);
         }
     }
+    else if (String(topic) == "JSONfromNodeRED"){ //subscription 3 json data hamdle 
+    //receive the json data from node red to esp
+        StaticJsonDocument<128> doc;
+
+        DeserializationError error = deserializeJson(doc, messageTemp);
+
+        if (error) {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return;
+        }
+
+        const char* device = doc["device"]; // "ESP MCU"
+        int temperature = doc["temperature"]; // 33
+        int humidity = doc["humidity"]; // 90
+        int lux = doc["lux"]; // 643
+
+        //print the values
+        String output = String(device)+ " " + String(temperature)+ " " + String(humidity)+ " " + String(lux);
+        Serial.println(output);
+    }
+
 }
 
 void connectAP()

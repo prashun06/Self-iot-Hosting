@@ -6,7 +6,7 @@
 
 unsigned long previousMillis=millis();
 
-void sendMQTTvalues(){
+void sendMQTTvalues(){ // send the json data from esp to nodered 
   StaticJsonDocument<96> doc;
 
   doc["device"] = "ESP MCU";

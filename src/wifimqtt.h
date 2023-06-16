@@ -21,7 +21,7 @@ void reconnect()
         if (client.connect(clientID.c_str(), mqtt_user, mqtt_password))
         {
             Serial.print("connect to MQTT");
-            client.subscribe("fromNodeRED"); //broker subscription 1
+            //client.subscribe("fromNodeRED"); //broker subscription 1
             client.subscribe("ledState"); //broker subscription 2
             client.subscribe("JSONfromNodeRED");
         }

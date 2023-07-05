@@ -46,10 +46,9 @@ PubSubClient client(espclient);
 
 void startCameraServer();
 void setupLedFlash(int pin);
-void callback(String topic, byte* message, unsigned int length);
 void sendMQTT(const uint8_t *buf, uint32_t len);
 void take_photo();
-void on_flash();
+void connectWifiandMQTT();
 void reconnect();
 
 void setup() {
@@ -86,11 +85,11 @@ void setup() {
   config.pixel_format = PIXFORMAT_JPEG;
   //init with high specs to pre-allocate larger buffers
   if(psramFound()){
-    config.frame_size = FRAMESIZE_UXGA;
+    config.frame_size = FRAMESIZE_VGA;
     config.jpeg_quality = 10;
     config.fb_count = 2;
   } else {
-    config.frame_size = FRAMESIZE_SVGA;
+    config.frame_size = FRAMESIZE_VGA;
     config.jpeg_quality = 12;
     config.fb_count = 1;
   }
@@ -118,7 +117,7 @@ void setup() {
     s->set_saturation(s, -2);//lower the saturation
   }
   //drop down frame size for higher initial frame rate
-  s->set_framesize(s, FRAMESIZE_QVGA);
+  s->set_framesize(s, FRAMESIZE_VGA);
 
   // Not used in our project
   #if defined(CAMERA_MODEL_M5STACK_WIDE)
@@ -126,6 +125,15 @@ void setup() {
     s->set_hmirror(s, 1);
   #endif
 
+  take_photo();
+
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_16, 1);
+  delay(500);
+  esp_deep_sleep_start();
+}
+
+void connectWifiandMQTT(){
+  
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -138,30 +146,12 @@ void setup() {
   // Set MQTT Connection
   client.setServer(mqtt_server, 1883);
   client.setBufferSize (MAX_PAYLOAD); //This is the maximum payload length
-  client.setCallback(callback);
-}
-
-
-void callback(String topic, byte* message, unsigned int length){
-    
-    //Serial.println(topic);
-    String messageTemp;
-    Serial.println(topic);
-    for(int i=0; i<length; i++)
-    {
-      //Serial.print((char)message[i]);
-      messageTemp += (char)message[i];
-    }
-
-    if (topic == topic_photo){ //subscription od fan topic
-      Serial.println(" photo taking ");
-      take_photo();
-    }
-    else if(topic == topic_Flash){
-      Serial.println(" flashing ");
-      on_flash();
-    }
+  
+  if (!client.connected()) {
+    reconnect();
   }
+
+}
 
 void sendMQTT(const uint8_t * buf, uint32_t len){
   Serial.println("Sending picture...");
@@ -184,31 +174,10 @@ void take_photo() {
   }
   Serial.println("Picture taken");
   digitalWrite(FLASH_LED, LOW);
+  connectWifiandMQTT();
   sendMQTT(fb->buf, fb->len);
   esp_camera_fb_return(fb); // must be used to free the memory allocated by esp_camera_fb_get().
   
-}
-
-void on_flash(){
-  flash = !flash;
-  Serial.print("Setting flash to ");
-  Serial.println(flash);
-  if(!flash){
-    for(int i=0; i<6; i++){
-      digitalWrite(FLASH_LED, HIGH);
-      delay(100);
-      digitalWrite(FLASH_LED, LOW);
-      delay(100);
-    }
-  }
-  if(flash){
-    for(int i=0; i<3; i++){
-      digitalWrite(FLASH_LED, HIGH);
-      delay(500);
-      digitalWrite(FLASH_LED, LOW);
-      delay(100);
-    }
-}
 }
 
 void reconnect() {
@@ -216,8 +185,6 @@ void reconnect() {
     Serial.print("Attempting MQTT connection...");
     if (client.connect(HostName, mqtt_user, mqtt_password)) {
       Serial.println("connected");
-      client.subscribe(topic_photo);
-      client.subscribe(topic_Flash);
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -228,8 +195,7 @@ void reconnect() {
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
+
   client.loop();
+  
 }
